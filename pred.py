@@ -1,4 +1,4 @@
-import os, csv, json
+import sys, os, csv, json
 import argparse
 import time
 from tqdm import tqdm
@@ -9,6 +9,10 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 import tiktoken
 import torch.multiprocessing as mp
 import torch
+
+sys.path.append(os.path.abspath(os.path.join (os.path.dirname(__file__), "..")))
+from model.llama_anns import LlamaForCausalLM
+from utils.kv_database import VectorDBCache
 
 model_map = json.loads(open('config/model2path.json', encoding='utf-8').read())
 maxlen_map = json.loads(open('config/model2maxlen.json', encoding='utf-8').read())
@@ -35,9 +39,12 @@ def query_llm(prompt, model, tokenizer, client=None, temperature=0.5, max_new_to
             input_ids = input_ids[:max_len//2] + input_ids[-max_len//2:]
             prompt = tokenizer.decode(input_ids)
     tries = 0
+    print (len (prompt))
+
     if model in model_map:
         model = model_map[model]
-    model = AutoModelForCausalLM.from_pretrained("/home/wentao/Desktop/workspace/llama/Llama3.2-3B-Instruct-hf", torch_dtype=torch.float16, device_map="auto")
+    model = LlamaForCausalLM.from_pretrained("/home/wentao/Desktop/workspace/llama/Llama3.2-3B-Instruct-hf").to (torch.bfloat16).to("cuda:0")
+    
     while tries < 5:
         tries += 1
         try:
@@ -51,8 +58,9 @@ def query_llm(prompt, model, tokenizer, client=None, temperature=0.5, max_new_to
             messages = [{"role": "user", "content": prompt}]
             tokenized_chat = tokenizer.apply_chat_template (messages, tokenize=True, add_generation_prompt=True, return_tensors="pt")
             tokenized_chat = tokenized_chat.to("cuda:0")
+            kv_cache = VectorDBCache(use_anns=False)
             with torch.no_grad():
-                outputs = model.generate(tokenized_chat, max_new_tokens=max_new_tokens)
+                outputs = model.generate(tokenized_chat, max_new_tokens=max_new_tokens, past_key_values=kv_cache, do_sample=False)
             content = tokenizer.decode(outputs[0])
             print (content)
             return content
@@ -150,13 +158,14 @@ def main():
             data.append(item)
 
     data_subsets = [data[i::args.n_proc] for i in range(args.n_proc)]
-    processes = []
-    for rank in range(args.n_proc):
-        p = mp.Process(target=get_pred, args=(data_subsets[rank], args, fout))
-        p.start()
-        processes.append(p)
-    for p in processes:
-        p.join()
+    get_pred(data_subsets[0], args, fout)
+    # processes = []
+    # for rank in range(args.n_proc):
+    #     p = mp.Process(target=get_pred, args=(data_subsets[rank], args, fout))
+    #     p.start()
+    #     processes.append(p)
+    # for p in processes:
+    #     p.join()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
