@@ -4,10 +4,11 @@ import time
 from tqdm import tqdm
 from datasets import load_dataset
 import re
-from openai import OpenAI
-from transformers import AutoTokenizer
+# from openai import OpenAI
+from transformers import AutoTokenizer, AutoModelForCausalLM
 import tiktoken
 import torch.multiprocessing as mp
+import torch
 
 model_map = json.loads(open('config/model2path.json', encoding='utf-8').read())
 maxlen_map = json.loads(open('config/model2maxlen.json', encoding='utf-8').read())
@@ -36,16 +37,25 @@ def query_llm(prompt, model, tokenizer, client=None, temperature=0.5, max_new_to
     tries = 0
     if model in model_map:
         model = model_map[model]
+    model = AutoModelForCausalLM.from_pretrained("/home/wentao/Desktop/workspace/llama/Llama3.2-3B-Instruct-hf", torch_dtype=torch.float16, device_map="auto")
     while tries < 5:
         tries += 1
         try:
-            completion = client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=temperature,
-                max_tokens=max_new_tokens,
-            )
-            return completion.choices[0].message.content
+            # completion = client.chat.completions.create(
+            #     model=model,
+            #     messages=[{"role": "user", "content": prompt}],
+            #     temperature=temperature,
+            #     max_tokens=max_new_tokens,
+            # )
+            # return completion.choices[0].message.content
+            messages = [{"role": "user", "content": prompt}]
+            tokenized_chat = tokenizer.apply_chat_template (messages, tokenize=True, add_generation_prompt=True, return_tensors="pt")
+            tokenized_chat = tokenized_chat.to("cuda:0")
+            with torch.no_grad():
+                outputs = model.generate(tokenized_chat, max_new_tokens=max_new_tokens)
+            content = tokenizer.decode(outputs[0])
+            print (content)
+            return content
         except KeyboardInterrupt as e:
             raise e
         except Exception as e:
@@ -73,10 +83,11 @@ def get_pred(data, args, fout):
         tokenizer = tiktoken.encoding_for_model("gpt-4o-2024-08-06")
     else:
         tokenizer = AutoTokenizer.from_pretrained(model_map[model], trust_remote_code=True)
-    client = OpenAI(
-        base_url=URL,
-        api_key=API_KEY
-    )
+    # client = OpenAI(
+    #     base_url=URL,
+    #     api_key=API_KEY
+    # )
+    client = None
     for item in tqdm(data):
         context = item['context']
         if args.rag > 0:
@@ -154,6 +165,6 @@ if __name__ == "__main__":
     parser.add_argument("--cot", "-cot", action='store_true') # set to True if using COT
     parser.add_argument("--no_context", "-nc", action='store_true') # set to True if using no context (directly measuring memorization)
     parser.add_argument("--rag", "-rag", type=int, default=0) # set to 0 if RAG is not used, otherwise set to N when using top-N retrieved context
-    parser.add_argument("--n_proc", "-n", type=int, default=16)
+    parser.add_argument("--n_proc", "-n", type=int, default=1)
     args = parser.parse_args()
     main()
