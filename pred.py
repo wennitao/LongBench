@@ -170,7 +170,7 @@ def main():
     # data_subsets = [data[i::args.n_proc] for i in range(args.n_proc)]
     # get_pred(data_subsets[0], args, fout)
     
-    get_pred([data[0]], args, fout)
+    get_pred(data, args, fout)
 
     # processes = []
     # for rank in range(args.n_proc):
