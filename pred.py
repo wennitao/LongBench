@@ -15,6 +15,10 @@ from model.llama_anns import LlamaForCausalLM
 from utils.kv_database import VectorDBCache
 from transformers.cache_utils import OffloadedCache
 
+# set random seed
+torch.manual_seed(42)
+torch.cuda.manual_seed(42)
+
 model_map = json.loads(open('config/model2path.json', encoding='utf-8').read())
 maxlen_map = json.loads(open('config/model2maxlen.json', encoding='utf-8').read())
 
@@ -56,14 +60,14 @@ def query_llm(prompt, model_name, model, tokenizer, client=None, temperature=0.5
             # return completion.choices[0].message.content
             messages = [{"role": "user", "content": prompt}]
             tokenized_chat = tokenizer.apply_chat_template (messages, tokenize=False, add_generation_prompt=False)
-            # print (tokenized_chat)
+            print (tokenized_chat)
             inputs = tokenizer.encode(tokenized_chat, return_tensors="pt").to("cuda:0")
             print (inputs.shape)
             # kv_cache = OffloadedCache ()
             kv_cache = VectorDBCache(use_anns=False)
             with torch.no_grad():
-                outputs = model.generate(inputs, max_new_tokens=max_new_tokens, past_key_values=kv_cache, do_sample=False)
-            content = tokenizer.decode(outputs[0])
+                outputs = model.generate(inputs, max_new_tokens=max_new_tokens, past_key_values=kv_cache, use_cache=True, do_sample=False)
+            content = tokenizer.decode(outputs[0], skip_special_tokens=False)
             print (content)
             return content
         except KeyboardInterrupt as e:
@@ -154,17 +158,20 @@ def main():
 
     # cache
     has_data = {}
-    if os.path.exists(out_file):
-        with open(out_file, encoding='utf-8') as f:
-            has_data = {json.loads(line)["_id"]: 0 for line in f}
-    fout = open(out_file, 'a', encoding='utf-8')
+    # if os.path.exists(out_file):
+    #     with open(out_file, encoding='utf-8') as f:
+    #         has_data = {json.loads(line)["_id"]: 0 for line in f}
+    fout = open(out_file, 'w', encoding='utf-8')
     data = []
     for item in data_all:
         if item["_id"] not in has_data:
             data.append(item)
 
-    data_subsets = [data[i::args.n_proc] for i in range(args.n_proc)]
-    get_pred(data_subsets[0], args, fout)
+    # data_subsets = [data[i::args.n_proc] for i in range(args.n_proc)]
+    # get_pred(data_subsets[0], args, fout)
+    
+    get_pred([data[0]], args, fout)
+
     # processes = []
     # for rank in range(args.n_proc):
     #     p = mp.Process(target=get_pred, args=(data_subsets[rank], args, fout))
