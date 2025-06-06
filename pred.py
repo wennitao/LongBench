@@ -64,7 +64,8 @@ def query_llm(prompt, model_name, model, tokenizer, client=None, temperature=0.5
             inputs = tokenizer.encode(tokenized_chat, return_tensors="pt").to("cuda:0")
             print (inputs.shape)
             # kv_cache = OffloadedCache ()
-            kv_cache = VectorDBCache(use_anns=False)
+            # kv_cache = VectorDBCache(use_anns=False)
+            kv_cache = VectorDBCache(use_anns=True, index="faiss_ivf_flat")
             with torch.no_grad():
                 outputs = model.generate(inputs, max_new_tokens=max_new_tokens, past_key_values=kv_cache, use_cache=True, do_sample=False)
             content = tokenizer.decode(outputs[0], skip_special_tokens=False)
