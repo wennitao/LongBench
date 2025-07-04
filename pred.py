@@ -11,8 +11,8 @@ import torch.multiprocessing as mp
 import torch
 
 sys.path.append(os.path.abspath(os.path.join (os.path.dirname(__file__), "..")))
-from model.llama_anns import LlamaForCausalLM
-from utils.kv_database import VectorDBCache
+from annstention.model.llama_anns import LlamaForCausalLM
+from annstention.utils.kv_database import VectorDBCache
 from transformers.cache_utils import OffloadedCache
 
 # set random seed
