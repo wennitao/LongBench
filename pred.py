@@ -60,16 +60,16 @@ def query_llm(prompt, model_name, model, tokenizer, client=None, temperature=0.5
             # return completion.choices[0].message.content
             messages = [{"role": "user", "content": prompt}]
             tokenized_chat = tokenizer.apply_chat_template (messages, tokenize=False, add_generation_prompt=False)
-            print (tokenized_chat)
+            # print (tokenized_chat)
             inputs = tokenizer.encode(tokenized_chat, return_tensors="pt").to("cuda:0")
-            print (inputs.shape)
+            # print (inputs.shape)
             # kv_cache = OffloadedCache ()
             # kv_cache = VectorDBCache(use_anns=False)
-            kv_cache = VectorDBCache(use_anns=True, index="faiss_ivf_flat")
+            kv_cache = VectorDBCache(use_anns=True, index="faiss_ivf_flat", nlist=128, nprobe=16, nprobe_on_cpu=0)
             with torch.no_grad():
                 outputs = model.generate(inputs, max_new_tokens=max_new_tokens, past_key_values=kv_cache, use_cache=True, do_sample=False)
             content = tokenizer.decode(outputs[0], skip_special_tokens=False)
-            print (content)
+            # print (content)
             return content
         except KeyboardInterrupt as e:
             raise e
