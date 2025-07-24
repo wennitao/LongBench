@@ -101,6 +101,7 @@ def get_pred(data, args, fout):
     
     # model = AutoModelForCausalLM.from_pretrained(model_map[model_name]).to (torch.bfloat16).to("cuda:0")
     model = LlamaForCausalLM.from_pretrained(model_map[model_name]).to (torch.bfloat16).to("cuda:0")
+    model.pass_qproj()
 
     # client = OpenAI(
     #     base_url=URL,
